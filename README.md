@@ -1,6 +1,6 @@
 # Shulker Restorer
 
-**Fabric mod for Minecraft Java 26.3**, aimed at restoring Shulker / Shulker Bullet behavior from the **Minecraft 1.20.5 release**. This is a mechanism-level patch, **not boat invulnerability**.
+**Fabric mod for Minecraft Java 26.3**, aimed at restoring Shulker / Shulker Bullet behavior from the **Minecraft 1.20.5 release**.
 
 ## Direct download
 
