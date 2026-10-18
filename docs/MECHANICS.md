@@ -1,47 +1,72 @@
-# Mechanics and verification
+# Shulker Restorer: 1.20.5 vs. 26.3
 
-## Why a boat-immunity workaround is intentionally not used
+## Scope and reference
 
-Making boats invulnerable to Shulker Bullets would hide one symptom by changing an unrelated Minecraft mechanic. This mod instead targets the regression identified in the 26.3 Shulker Bullet projectile-redirection logic.
+Actual **Minecraft Java 1.20.5 release commit**, not a prerelease:
+- Reference commit: `c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6`
+- Bullet: https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/blob/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity/projectile/ShulkerBullet.java
+- Projectile: https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/blob/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity/projectile/Projectile.java
+- ProjectileUtil: https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/blob/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity/projectile/ProjectileUtil.java
+- Shulker: https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/blob/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity/monster/Shulker.java
 
-## Source comparison
+26.3 references:
+- Bullet: https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/shulkerbullet/
+- Projectile: https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/projectile/
+- ProjectileUtil: https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/projectileutil/
+- Shulker: https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/monster/shulker/
 
-### Before 26.3 (26.2-snapshot-2)
+These are **reference links only**. Mojang's decompiled source is not copied into this mod.
 
-- `ShulkerBullet` has no `onRedirectProjectile` override.
-- The `Projectile.onHit` handler invokes `hitProjectile.deflect(ProjectileDeflection.AIM_DEFLECT, this.getOwner(), this.owner, true)` when an entity hit is a redirectable projectile.
-- `AIM_DEFLECT` sets redirected projectile movement according to the deflecting entity's look direction.
+## Verified differences implemented
 
-Reference: https://github.com/ohnodev/decompiled-minecraft-26-2-SNAPSHOT-2/tree/main/src/net/minecraft/world/entity/projectile
+### 1. Projectile redirection
 
-### Minecraft 26.3
+Minecraft 1.20.5 `Projectile.onHit`: redirectable projectile targets receive `AIM_DEFLECT` using the hitting projectile's owner.
 
-- The generic `Projectile.onHit` calls `this.onRedirectProjectile(hitProjectile)`.
-- The generic `Projectile.onRedirectProjectile` uses `AIM_DEFLECT` with a power of 1.0; its 26.3 implementation remains equivalent to the 26.2 redirection path.
-- `ShulkerBullet` overrides the generic hook and uses `MOMENTUM_DEFLECT` with the Shulker Bullet as deflector instead.
-- In 26.3, `MOMENTUM_DEFLECT` obtains the deflecting entity's known speed, normalizes it, and redirects the hit projectile along it. That can change subsequent collisions.
+26.3 `ShulkerBullet.onRedirectProjectile`: `MOMENTUM_DEFLECT` with the Shulker Bullet itself as the redirecting entity. This changes the direction of reflected projectiles.
 
-Reference (current source): https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/shulkerbullet/
+**Fix:** `ShulkerBulletMixin` delegates to the base `Projectile.onRedirectProjectile`, whose 26.3 `AIM_DEFLECT` path is the closest current equivalent to the 1.20.5 logic.
 
-### This mod
+### 2. Collision-before-movement order
 
-Mixin: `ShulkerBulletMixin` intercepts `ShulkerBullet.onRedirectProjectile`, delegates to `super.onRedirectProjectile(hitProjectile)`, then cancels the Shulker-specific body. This restores the old *Shulker Bullet redirection branch* rather than modifying boats, hitboxes, damage, velocities of unrelated projectiles, or general collision rules.
+1.20.5 `ShulkerBullet.tick()`:
+1. Run homing physics.
+2. Compute hit result with `ProjectileUtil.getHitResultOnMoveVector`.
+3. Immediately call `hitTargetOrDeflectSelf` on a hit.
+4. Run block checks, move, and rotate.
 
-`ProjectileDeflection.AIM_DEFLECT` in 26.3 still uses the deflector's look vector; the added power argument is 1.0, so this path matches its earlier one-vector behavior.
+26.3 `ShulkerBullet.tick()`:
+1. Run homing physics.
+2. Compute hit result.
+3. Move, apply block effects / portal logic.
+4. Process hit only afterward, and only if still alive.
 
-## Suggested manual tests (not yet performed)
+**Fix:** Redirect Shulker Bullet's internal raycast invocation. Apply the hit immediately and return `null` so that the 26.3 deferred hit branch cannot process it twice. This restores the most relevant ordering; **block-checking and portal implementation remain 26.3**.
 
-1. Start **two fresh 26.3 Fabric test worlds** with identical seeds, structures and farm conditions: one without the mod (control) and one with Shulker Restorer.
-2. Verify mod load in server log and compare redirectable-projectile trajectories using a small reproducible setup.
-3. Paste the exact 1.28k/h farm schematic on both worlds, align the armor stand as required by the designer, and measure boat lifetime and accumulated Shulker Shells.
-4. Run at least **20 hours** of simulated game time with actual server ticks and preferably **100+ hours** for evidence of reliability. A 50-minute test is not a reliability proof.
-5. Record `/tick query` (if available), TPS/MSPT, bullet count, boat disappearance, ejection state, rates/hour, and versions/mod list. Compare control and patched cases.
-6. Test both playerless and playerful farm variants if relevant to the design. The 1.28k/h name may refer to a playerful condition.
+### 3. Collision margin
 
-If boats still break, investigate other causes independently. Avoid claiming all older farms are fully restored merely because redirect behavior is patched.
+1.20.5 `ProjectileUtil.getHitResultOnMoveVector` passes a constant `0.3F` entity margin.
 
-## Why no global 26.2 rollback?
+26.3 delegates to `computeMargin(source)`, which expands the margin over the early projectile ticks.
 
-26.3 includes unrelated projectile updates. This mod restricts itself to the confirmed new, Shulker-specific branch so the fix does not accidentally regress unrelated arrows, fireballs, fishing rods, players, or boats.
+**Fix:** `ProjectileUtilMixin` returns `0.3F` specifically when `source instanceof ShulkerBullet`. No other projectile's margin changes.
 
-The old 1.28k/h farm was unreliable even before 26.3; this mod only removes the specific newer regression.
+## Differences reviewed but intentionally unchanged
+
+- **Shulker duplication:** Both versions use an open shulker, successful teleport, and `(nearbyShulkers - 1) / 5.0F` failure chance. Core spawning logic is effectively the same.
+- **Shulker teleportation:** In 26.3 there is a new `#shulker_does_not_teleport_to` block tag. Disabling it would also override intentional world/datapack teleport restrictions; it has **not** been globally disabled.
+- **Boats and passengers:** 1.20.5 vs. 26.3 changes outside the bullet logic could affect directional ejection. No blanket patches.
+- **World border and generic projectile collisions:** Current 26.3 behavior is retained.
+- This change **does not** claim byte-for-byte 1.20.5 gameplay equivalence.
+
+## Validation plan
+
+1. Build using JDK 25 with `./gradlew clean build` and inspect Mixin compilation.
+2. Launch Minecraft 26.3 with Fabric, confirm Mixin application without `InvalidInjectionException` and with `shulker-restorer` visible in loaded mods.
+3. Test isolated Shulker Bullet projectile deflections with and without the mod.
+4. Run the exact 1.28k/h Shulker Farm schematic in two controlled worlds: vanilla 26.3 vs. patched 26.3.
+5. Use identical seeds, orientation, player position, spawn loading, and shulker alignment.
+6. Run at least 20 real server hours and ideally 100+. Record each boat loss, ejection failure, spawning rate, entities, TPS/MSPT, and shell count.
+7. If the farm breaks with restored bullet behavior, isolate other systems (boat passenger physics, teleport candidates, entity collisions) and add fixes **only when confirmed**.
+
+CI success confirms buildability; it does not establish that mixins apply in a running game or that a farm stays reliable for hours.

@@ -2,7 +2,7 @@
   "required": true,
   "package": "dev.fayber.shulkerrestorer.mixin",
   "compatibilityLevel": "JAVA_25",
-  "mixins": ["ShulkerBulletMixin"],
+  "mixins": ["ShulkerBulletMixin", "ProjectileUtilMixin"],
   "injectors": {
     "defaultRequire": 1
   }

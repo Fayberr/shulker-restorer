@@ -10,6 +10,6 @@ public final class ShulkerRestorer implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Shulker Restorer active: legacy Shulker Bullet projectile redirection enabled.");
+        LOGGER.info("Shulker Restorer: legacy 1.20.5 Shulker Bullet reflection, hit order and collision margin enabled.");
     }
 }
