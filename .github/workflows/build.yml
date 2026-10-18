@@ -23,6 +23,31 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: Build the mod
         run: ./gradlew clean build --stacktrace
+      - name: Smoke-test Minecraft 26.3 dedicated server startup
+        timeout-minutes: 6
+        shell: bash
+        run: |
+          mkdir -p run
+          printf 'eula=true\n' > run/eula.txt
+          ./gradlew runServer --console=plain --no-configuration-cache > server-smoke.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 150); do
+            if grep -Eq 'Done \(' server-smoke.log; then
+              echo 'Dedicated server reached ready state.'
+              tail -n 35 server-smoke.log
+              exit 0
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo 'Dedicated server process exited before reaching ready state.'
+              tail -n 180 server-smoke.log
+              exit 1
+            fi
+            sleep 2
+          done
+          echo 'Timed out waiting for dedicated server.'
+          tail -n 180 server-smoke.log
+          exit 1
       - name: Upload built jars
         uses: actions/upload-artifact@v4
         with:

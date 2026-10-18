@@ -1,6 +1,6 @@
 # Shulker Restorer
 
-Fabric mod for **Minecraft Java Edition 26.3**. Its purpose is to restore relevant **1.20.5 Shulker Bullet mechanics** so older technical farms can be tested without changing the boats themselves.
+Fabric mod for **Minecraft Java Edition 26.3**. Restores selected **Minecraft 1.20.5 Shulker and Shulker Bullet mechanics** to help older technical farms behave more like they did originally.
 
 ## What it restores
 
@@ -8,9 +8,10 @@ Fabric mod for **Minecraft Java Edition 26.3**. Its purpose is to restore releva
 | --- | --- | --- | --- |
 | Shulker Bullet redirects another projectile | `AIM_DEFLECT` | Shulker-specific `MOMENTUM_DEFLECT` | 1.20.5 redirection via base `Projectile` |
 | Bullet collision processing | Before bullet movement | After movement and block effects | Hit applied before bullet movement |
-| Projectile raycast collision margin for Shulker Bullets | Constant `0.3F` | Grows from `0.0F` to `0.3F` over early ticks | Constant `0.3F` |
+| Shulker Bullet raycast margin | Constant `0.3F` | Builds up from `0.0F` to `0.3F` over early ticks | Constant `0.3F` |
+| Shulker teleport destination tag | No `#shulker_does_not_teleport_to` restriction | New tag blocks some teleport targets | Tag restriction skipped for Shulkers only |
 
-All three modifications are **scoped to Shulker Bullets**. No boats become invulnerable; no universal collision or damage rules are replaced.
+No boats become invulnerable; no universal collision or damage rules are replaced.
 
 ## Install
 
@@ -18,25 +19,27 @@ All three modifications are **scoped to Shulker Bullets**. No boats become invul
 - **Fabric Loader 0.19.5+**
 - **Java 25**
 - No Fabric API required
-- **Install on the server** (or into the singleplayer instance). Player clients on a dedicated server do not need the mod.
+- **Install on the server** (or in singleplayer). Connecting clients do not require it.
 
 Download the `shulker-restorer-<version>.jar` from the latest successful [GitHub Actions Build](https://github.com/Fayberr/shulker-restorer/actions/workflows/build.yml) artifacts, unzip the artifact package, and place the jar in the server's `mods` folder.
 
 ## Build from source
 
-Run `./gradlew clean build` on Linux/macOS or `gradlew.bat clean build` on Windows, with JDK 25. The distributable jar will be in `build/libs/` (use the jar **without** `-sources`).
+Run `./gradlew clean build` on Linux/macOS or `gradlew.bat clean build` on Windows, with JDK 25. The distributable jar is in `build/libs/` (select the jar without `-sources`).
 
-## What this DOES NOT claim
+GitHub Actions verifies the mod compiles **and** attempts a headless dedicated-server startup smoke test. This is still not a proof of long-term farm operation.
 
-This is a **targeted compatibility restoration**, not a full port of Minecraft 1.20.5 into 26.3. Shulker targeting, teleport destination rules, passengers, armor stand behavior, projectile/boat entity physics and other changed systems still follow 26.3 unless expressly patched.
+## Important limitations
 
-The 1.28k Shulker Farm was reportedly unreliable even before 26.3, so there is **no guarantee** this makes it maintenance-free. Real long-term testing is required.
+This is a **targeted restoration of identified 1.20.5 mechanics**, not a full recreation of all Minecraft 1.20.5 internals. Vehicle / passenger physics, entity collision systems, and unrelated differences may still affect older farms.
 
-See [Mechanics and test protocol](docs/MECHANICS.md) for the precise source comparison and suggested verification.
+The old 1.28k/h Shulker Farm was already known to have intermittent reliability issues before 26.3. **No guarantee of unattended multi-day reliability.** Long-term controlled testing remains necessary.
 
-## Sources
+See [Mechanics and test protocol](docs/MECHANICS.md).
 
-- [Minecraft 1.20.5 release (decompiled Mojmap reference)](https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/tree/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity)
+## References
+
+- [Minecraft Java Edition 1.20.5 release decompiled Mojang mappings](https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/tree/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity)
 - [Minecraft 26.3 ShulkerBullet](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/shulkerbullet/)
 - [Minecraft 26.3 ProjectileUtil](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/projectileutil/)
 - [Minecraft 26.3 Shulker](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/monster/shulker/)
