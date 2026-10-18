@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "shulker-restorer",
+  "version": "${version}",
+  "name": "Shulker Restorer",
+  "description": "Restores pre-26.3 Shulker Bullet projectile redirection mechanics without granting boats immunity.",
+  "authors": ["Fayberr"],
+  "contact": {
+    "sources": "https://github.com/Fayberr/shulker-restorer",
+    "issues": "https://github.com/Fayberr/shulker-restorer/issues"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["dev.fayber.shulkerrestorer.ShulkerRestorer"]
+  },
+  "mixins": ["shulker-restorer.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "java": ">=25"
+  }
+}
