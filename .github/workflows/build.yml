@@ -1,16 +1,18 @@
-name: Build
+name: Build JAR
 
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
+# ONE workflow: build the distributable JAR and publish that SAME JAR
+# as a GitHub Release asset, so users have a stable direct-download URL.
+# No server startup, world simulation, scheduled tests, or extra workflows.
 jobs:
   build:
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,14 +23,24 @@ jobs:
           java-version: '25'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Build the mod
+      - name: Build distributable JAR
         run: ./gradlew clean build --stacktrace
-      - name: Minecraft 26.3 runtime mixin smoke test
-        timeout-minutes: 7
-        run: python3 ci/smoke_server.py
-      - name: Upload built jars
-        uses: actions/upload-artifact@v4
-        with:
-          name: shulker-restorer-26.3
-          path: build/libs/*.jar
-          if-no-files-found: error
+      - name: Publish direct-download JAR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^mod_version=//p' gradle.properties)"
+          TAG="v${VERSION}"
+          JAR="build/libs/shulker-restorer-${VERSION}.jar"
+          test -s "$JAR"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$JAR" --clobber
+          else
+            gh release create "$TAG" "$JAR" \
+              --target "$GITHUB_SHA" \
+              --title "Shulker Restorer ${VERSION} (Minecraft 26.3)" \
+              --notes "Minecraft 26.3 Fabric mod restoring targeted Minecraft 1.20.5 Shulker mechanics. Experimental: long-term 1.28k farm reliability not yet established." \
+              --latest
+          fi

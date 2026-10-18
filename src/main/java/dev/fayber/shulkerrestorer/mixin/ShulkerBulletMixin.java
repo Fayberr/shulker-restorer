@@ -1,10 +1,10 @@
 package dev.fayber.shulkerrestorer.mixin;
 
+import dev.fayber.shulkerrestorer.LegacyBulletCollision;
 import java.util.function.Predicate;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.projectile.Projectile;
-import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
@@ -15,8 +15,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Restore Shulker Bullet mechanics found in the Minecraft 1.20.5 release.
- * Only ShulkerBullet is affected; other projectile types retain 26.3 behavior.
+ * Restore the pre-26.3 redirect behavior and the 1.20.5 hit ordering for
+ * Shulker Bullets without changing boats, other projectiles, or world rules.
  */
 @Mixin(ShulkerBullet.class)
 public abstract class ShulkerBulletMixin extends Projectile {
@@ -24,30 +24,27 @@ public abstract class ShulkerBulletMixin extends Projectile {
         super(type, level);
     }
 
-    /**
-     * Since 26.3, ShulkerBullets override redirect behavior with MOMENTUM_DEFLECT.
-     * In 1.20.5 the ordinary Projectile hit path used AIM_DEFLECT instead.
-     * Delegating to the 26.3 base-class implementation restores that behavior.
-     */
     @Inject(
         method = "onRedirectProjectile(Lnet/minecraft/world/entity/projectile/Projectile;)V",
         at = @At("HEAD"),
-        cancellable = true
+        cancellable = true,
+        require = 1
     )
     private void shulkerRestorer$restoreLegacyRedirect(Projectile hitProjectile, CallbackInfo ci) {
+        // 1.20.5 used AIM_DEFLECT from the generic Projectile hit handler.
+        // The 26.3 base hook retains this action with the default 1.0 power.
         super.onRedirectProjectile(hitProjectile);
         ci.cancel();
     }
 
     /**
-     * In 1.20.5 the Shulker Bullet performed its raycast and applied the hit
-     * BEFORE moving for the tick. 26.3 collects the hit, moves, processes block
-     * effects, and only then applies the hit. Intercept the sole raycast in
-     * ShulkerBullet.tick, handle it immediately, and give vanilla no deferred
-     * result to process.
+     * In 1.20.5 the collision was resolved before moving the bullet.
+     * By calculating and resolving the hit inside this invocation we recover
+     * that order. Returning null skips the deferred 26.3 hit handler, so the
+     * collision cannot be applied twice.
      *
-     * This intentionally does not alter global ProjectileUtil logic and it
-     * does not grant any entity (including boats) invulnerability.
+     * The helper also reproduces the 1.20.5 raycast's fixed 0.3 entity
+     * margin and block clipping without 26.3's additional border handling.
      */
     @Redirect(
         method = "tick()V",
@@ -57,12 +54,11 @@ public abstract class ShulkerBulletMixin extends Projectile {
         ),
         require = 1
     )
-    private HitResult shulkerRestorer$applyHitBeforeMovement(Entity source, Predicate<Entity> matching) {
-        HitResult result = ProjectileUtil.getHitResultOnMoveVector(source, matching);
-        if (result != null && result.getType() != HitResult.Type.MISS) {
-            this.hitTargetOrDeflectSelf(result);
+    private HitResult shulkerRestorer$resolveLegacyCollision(Entity source, Predicate<Entity> matching) {
+        HitResult hit = LegacyBulletCollision.raycast(source, matching);
+        if (hit != null && hit.getType() != HitResult.Type.MISS) {
+            this.hitTargetOrDeflectSelf(hit);
         }
-        // 26.3's late hit branch is guarded by result != null.
         return null;
     }
 }

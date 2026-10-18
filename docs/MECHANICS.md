@@ -1,43 +1,42 @@
-# Shulker Restorer: mechanics provenance and testing
+# Mechanics verification: Minecraft 1.20.5 vs 26.3
 
-## Verified source versions
+## Primary source comparison
 
-**1.20.5 release commit:** `c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6` in
-https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/tree/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity
+Actual 1.20.5 release commit: [Mojang-mapped decompilation](https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/tree/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity).
 
-**Minecraft 26.3:**
-- https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/shulkerbullet/
-- https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/projectile/
-- https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/projectileutil/
-- https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/monster/shulker/
+Relevant Minecraft 26.3 source:
+- [ShulkerBullet.java](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/shulkerbullet/)
+- [ProjectileUtil.java](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/projectileutil/)
+- [Shulker.java](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/monster/shulker/)
 
-These are research references; no Mojang decompiled code is distributed in the repository.
+No decompiled Mojang source files are distributed in this repository.
 
-## Changes implemented, scoped to relevant entities
+## Explicit restores
 
-1. **Projectile redirection:** 1.20.5 used `AIM_DEFLECT` from `Projectile.onHit`. In 26.3 Shulker Bullets uniquely override `onRedirectProjectile` and redirect with `MOMENTUM_DEFLECT`. The ShulkerBulletMixin delegates to 26.3's base implementation, equivalent to the old `AIM_DEFLECT` path.
+1. **Redirectable projectile deflections**: In 1.20.5, `Projectile.onHit` uses the generic `AIM_DEFLECT` strategy. Minecraft 26.3 adds a ShulkerBullet-specific `onRedirectProjectile` override using `MOMENTUM_DEFLECT`. The `ShulkerBulletMixin` cancels that override and delegates to `super.onRedirectProjectile`, which keeps the old `AIM_DEFLECT` semantics for the affected call.
 
-2. **Hit processing order:** 1.20.5 ShulkerBullet.tick calls `hitTargetOrDeflectSelf` immediately after its raycast, before movement. In 26.3 the game calculates the raycast, moves the bullet, applies block and portal effects, and then processes the hit. ShulkerBulletMixin redirects the bullet's own raycast, processes any hit immediately, and returns null to prevent the late 26.3 branch running a second time. This deliberately retains 26.3 block and portal APIs.
+2. **Collision ordering**: In 1.20.5, ShulkerBullet resolves a raycast hit before bullet movement. In 26.3 it resolves the hit after moving and processing block effects. The `@Redirect` Mixin invokes a 1.20.5-style raycast and processes its hit immediately, returning `null` so the deferred 26.3 handler is skipped. Bullet movement and general ticking remain under current game APIs. Older `checkInsideBlocks` calls cannot be transplanted literally because 26.3 has a redesigned block/portal processing lifecycle.
 
-3. **Raycast margin:** 1.20.5 uses 0.3F on every projectile movement raycast; 26.3 computes a progressively increasing margin based on tick age. ProjectileUtilMixin returns 0.3F for Shulker Bullets only.
+3. **Raycast details**: In 1.20.5, `ProjectileUtil.getHitResultOnMoveVector` uses constant `0.3F` to inflate entity hitboxes, clips blocks with `Level.clip`, limits the raycast to the earliest block hit, then checks potential entities inside the expanded swept AABB. The new `LegacyBulletCollision.raycast` reconstructs this for Shulker Bullets, calling the current `ProjectileUtil.getEntityHitResult` overload that uses the same entity intersection criterion. This also avoids changing the collision behavior of all other projectiles.
 
-4. **Shulker teleport candidates:** 26.3 adds `BlockTags.SHULKER_DOES_NOT_TELEPORT_TO` as an extra candidate filter in `Shulker.teleportSomewhere`. The tag did not exist in 1.20.5. ShulkerMixin skips that one filter for Shulkers while retaining all other vanilla teleport checks, including world border, attach face, and collision restrictions. This intentionally bypasses datapack restrictions attached to that specific new 26.3 tag.
+4. **Teleport target blacklist**: Minecraft 26.3 additionally rejects attachable blocks tagged `SHULKER_DOES_NOT_TELEPORT_TO`, introduced since 1.20.5. The `ShulkerMixin` selectively ignores that extra check. The standard teleport location, world border, attachable face and collision checks remain intact.
 
-## Unchanged mechanics / exclusions
+## Reviewed / unchanged
 
-- **Duplication:** Both reference versions require the Shulker to be open and teleport successfully; the nearby-Shulker-based failure chance remains `(count - 1) / 5.0F`. No duplication-rate modifications.
-- **Projectile spawn location:** Both versions place a new bullet at the shooter bounding-box center; no separate fix required.
-- **Generic projectile physics and boat durability:** Left at 26.3. No boat immunity.
-- **General teleport movement, vehicle passenger ejection and entity raycasting changes:** Not backported without evidence they specifically break the farm.
-- **World border raycast implementation:** Still uses 26.3 `clipIncludingBorder`.
-- This mod is NOT an exact byte-for-byte 1.20.5 runtime emulation.
+- The Shulker Bullet constructor still spawns the projectile at the owner's bounding-box center, as it did in 1.20.5.
+- Bullet homing uses the same basic acceleration, targetDelta changes and random 10-50-step direction planning.
+- The Shulker duplication procedure still depends on a successful teleport and nearby Shulker population, with failure probability `(count - 1) / 5.0F`. No non-vanilla duplication bonus.
+- Damage, levitation, sounds and projectile destruction remain current vanilla, where corresponding gameplay behavior matches.
+- World / portal internals and `Projectile.hitTargetOrDeflectSelf` have evolved; this is a targeted compatibility patch, not byte-for-byte restoration of every superclass and physics implementation.
+- Boat eject direction and related passenger mechanics are not patched.
+- The restored `Level.clip` semantics mean some 26.3 world-border interactions differ when the mod is installed. This is intentional for Shulker Bullets only.
 
-## Test matrix (not completed merely by building)
+## Validation record
 
-- **CI:** Compile with JDK 25 and try booting a dedicated 26.3 Fabric server. A passing boot only confirms the game's initial classloading, not every on-demand entity transformation.
-- **Targeted tests:** Summon Shulkers and Shulker Bullets in a test world, check mixin runtime errors, compare projectile redirection trajectories, hit effects and teleport destinations.
-- **Farm A/B:** Same orientation, identical playerful/playerless state, seeds, farm schematics, armor stands and boats in 26.3 without the mod (control) and with the mod.
-- **Reliability:** At least 20 hours of real server ticks and preferably 100+ hours, tracking shell yield, failure time, boats broken, ejection direction, Shulker count, TPS/MSPT and lag.
-- **If failure persists:** Investigate boat passenger mechanics, entity hitbox changes or unrelated version regressions, before any broad additional patch.
+- Earlier version (commit `072aa12`) built successfully and passed a dedicated-server startup + Shulker / Shulker Bullet summon smoke test.
+- This version's source changes require their own build; a successful JAR build proves Java compilation and mixin remapping but does not independently test how the historical Shulker farm performs.
+- The GitHub workflow is deliberately limited to a single build + release workflow at the user's request.
 
-Build + server smoke success does not warrant claiming 1.28k/h all-day reliability.
+### Remaining definitive farm test
+
+A 1.28k/h farm world or schematic is required. Paste/build into a fresh Minecraft 26.3 world, align the armor stand and boats as the original designer specified, and compare the mod against vanilla 26.3 under identical conditions. Run long enough to detect random failures (at least 20 hours, ideally 100+ hours), log boat destruction, rates and ejection. Any persistent failure may be due to unrelated boat ejection or other version changes, requiring follow-up targeted patches.

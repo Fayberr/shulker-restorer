@@ -1,47 +1,39 @@
 # Shulker Restorer
 
-Fabric mod for **Minecraft Java Edition 26.3**. Restores selected **Minecraft 1.20.5 Shulker and Shulker Bullet mechanics** to help older technical farms behave more like they did originally.
+**Fabric mod for Minecraft Java 26.3**, aimed at restoring Shulker / Shulker Bullet behavior from the **Minecraft 1.20.5 release**. This is a mechanism-level patch, **not boat invulnerability**.
 
-## What it restores
+## Direct download
 
-| Mechanic | 1.20.5 | 26.3 vanilla | With Shulker Restorer |
-| --- | --- | --- | --- |
-| Shulker Bullet redirects another projectile | `AIM_DEFLECT` | Shulker-specific `MOMENTUM_DEFLECT` | 1.20.5 redirection via base `Projectile` |
-| Bullet collision processing | Before bullet movement | After movement and block effects | Hit applied before bullet movement |
-| Shulker Bullet raycast margin | Constant `0.3F` | Builds up from `0.0F` to `0.3F` over early ticks | Constant `0.3F` |
-| Shulker teleport destination tag | No `#shulker_does_not_teleport_to` restriction | New tag blocks some teleport targets | Tag restriction skipped for Shulkers only |
+After the GitHub build succeeds, download the compiled jar directly:
+**[shulker-restorer-1.1.0.jar](https://github.com/Fayberr/shulker-restorer/releases/download/v1.1.0/shulker-restorer-1.1.0.jar)**
 
-No boats become invulnerable; no universal collision or damage rules are replaced.
+Requires Java 25 and Fabric Loader 0.19.5+. Install on a dedicated server, or in the singleplayer installation. Fabric API is not required. This is a server-side mechanics patch; clients joining a modded dedicated server do not need to install it.
 
-## Install
+## Implemented changes
 
-- **Minecraft Java 26.3**
-- **Fabric Loader 0.19.5+**
-- **Java 25**
-- No Fabric API required
-- **Install on the server** (or in singleplayer). Connecting clients do not require it.
+| Behavior | 1.20.5 reference | 26.3 without mod | With this mod |
+|---|---|---|---|
+| Redirected projectiles hit by Shulker Bullets | Generic `AIM_DEFLECT` | Shulker-specific `MOMENTUM_DEFLECT` | Generic `AIM_DEFLECT` |
+| Bullet collision timing | Before moving | After moving / block effects | Before moving |
+| Entity margin for bullet raycast | Constant `0.3F` | Gradually grows to `0.3F` | Constant `0.3F` |
+| Block raycast vs world border | `Level.clip` | `clipIncludingBorder` | `Level.clip` |
+| Shulker teleport target blacklist | Not present | Additional `#shulker_does_not_teleport_to` restriction | Additional blacklist is ignored for Shulkers only |
 
-Download the `shulker-restorer-<version>.jar` from the latest successful [GitHub Actions Build](https://github.com/Fayberr/shulker-restorer/actions/workflows/build.yml) artifacts, unzip the artifact package, and place the jar in the server's `mods` folder.
+Only Shulker / Shulker Bullet methods are patched. Unrelated projectiles, boats, block damage and generic entity rules retain 26.3 behavior.
 
-## Build from source
+## Verification limits
 
-Run `./gradlew clean build` on Linux/macOS or `gradlew.bat clean build` on Windows, with JDK 25. The distributable jar is in `build/libs/` (select the jar without `-sources`).
+- JAR compiles with Minecraft 26.3, Java 25 and Fabric Loom.
+- In an earlier 26.3 revision, an actual dedicated server was successfully started and both a Shulker and a Shulker Bullet were summoned without mixin errors.
+- The current version modifies the raycast adapter, and must be evaluated in the actual target farm to demonstrate sustained operation.
+- **The 1.28k/h boat-based Shulker Farm was unreliable even before 26.3; this mod cannot guarantee maintenance-free operation.**
+- The aim is to restore the verified differences relevant to these mechanics. It does not embed or replace the entire Minecraft 1.20.5 implementation, and some other engine behavior remains 26.3.
+- The new 26.3 block-tag restriction intentionally is bypassed for Shulkers, including datapack additions to the tag.
 
-GitHub Actions verifies the mod compiles **and** attempts a headless dedicated-server startup smoke test. This is still not a proof of long-term farm operation.
+See [technical comparison and test protocol](docs/MECHANICS.md).
 
-## Important limitations
+## Build
 
-This is a **targeted restoration of identified 1.20.5 mechanics**, not a full recreation of all Minecraft 1.20.5 internals. Vehicle / passenger physics, entity collision systems, and unrelated differences may still affect older farms.
+`./gradlew clean build` (JDK 25). Only **one GitHub Actions workflow** is provided, which builds the jar and publishes it to the GitHub release for a directly downloadable single jar. No farm testing is run in GitHub Actions.
 
-The old 1.28k/h Shulker Farm was already known to have intermittent reliability issues before 26.3. **No guarantee of unattended multi-day reliability.** Long-term controlled testing remains necessary.
-
-See [Mechanics and test protocol](docs/MECHANICS.md).
-
-## References
-
-- [Minecraft Java Edition 1.20.5 release decompiled Mojang mappings](https://github.com/Moxie-Stuff/MinecraftDeobfuscated-Mojang/tree/c7bfd400c4b15bfdac823d6872e83f87a5d7cdf6/minecraft/src/net/minecraft/world/entity)
-- [Minecraft 26.3 ShulkerBullet](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/shulkerbullet/)
-- [Minecraft 26.3 ProjectileUtil](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/projectile/projectileutil/)
-- [Minecraft 26.3 Shulker](https://mc-packet-reference.netlify.app/26.x/source/net/minecraft/world/entity/monster/shulker/)
-
-MIT licensed; not affiliated with Mojang or Microsoft.
+MIT license; not affiliated with Mojang or Microsoft.
