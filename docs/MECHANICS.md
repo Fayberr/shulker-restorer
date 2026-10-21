@@ -34,7 +34,7 @@ No decompiled Mojang source files are distributed in this repository.
 ## Validation record
 
 - Earlier version (commit `072aa12`) built successfully and passed a dedicated-server startup + Shulker / Shulker Bullet summon smoke test.
-- This version's source changes require their own build; a successful JAR build proves Java compilation and mixin remapping but does not independently test how the historical Shulker farm performs.
+- Version 1.1.0 built and passed a dedicated-server startup, Shulker and Shulker Bullet summon, 200-tick run, save and shutdown check on 21 October 2026. This does not test sustained farm operation.
 - The GitHub workflow is deliberately limited to a single build + release workflow at the user's request.
 
 ### Remaining definitive farm test

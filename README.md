@@ -24,8 +24,8 @@ Only Shulker / Shulker Bullet methods are patched. Unrelated projectiles, boats,
 ## Verification limits
 
 - JAR compiles with Minecraft 26.3, Java 25 and Fabric Loom.
-- In an earlier 26.3 revision, an actual dedicated server was successfully started and both a Shulker and a Shulker Bullet were summoned without mixin errors.
-- The current version modifies the raycast adapter, and must be evaluated in the actual target farm to demonstrate sustained operation.
+- Version 1.1.0 passed a dedicated-server startup, Shulker and Shulker Bullet summon, 200-tick run, save and shutdown check on 21 October 2026.
+- Sustained operation still needs testing in the target farm; the startup check does not measure farm rates or long-term reliability.
 - **The 1.28k/h boat-based Shulker Farm was unreliable even before 26.3; this mod cannot guarantee maintenance-free operation.**
 - The aim is to restore the verified differences relevant to these mechanics. It does not embed or replace the entire Minecraft 1.20.5 implementation, and some other engine behavior remains 26.3.
 - The new 26.3 block-tag restriction intentionally is bypassed for Shulkers, including datapack additions to the tag.
